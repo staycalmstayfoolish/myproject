@@ -74,13 +74,13 @@ class formatting:
                 if ph_num != '0' and temp.find('input') < 0:
                     os.remove(path_in + item)
                     continue
-                elif 'mem01' in fnlist and temp.find('input') > 0:
+                elif 'mem01' in fnlist and temp.find('input') > 0 and ph_num > '0':
                     path_route = path_in.replace('tv_mem/','')
                     route_file = path_route + 'board_route.txt'
                     route_cfg = self.read_route_cfg(route_file)
 
                     mem_base1 = route_cfg[core_id][Route_cfg.MEM_BASE1_E.value]
-                    mem_base2 = route_cfg[core_id][Route_cfg.MEM_BASE2_E.value]
+                    #mem_base2 = route_cfg[core_id][Route_cfg.MEM_BASE2_E.value]
                     valid_data_start = mem_base1 / const.LINE_LEN + 1
                     valid_data_line = (mem_base2 - mem_base1) / const.LINE_LEN
                     self.format_input_core(valid_data_start, valid_data_line, path_in + item)
@@ -110,7 +110,6 @@ class formatting:
                     last_core_id = core_id
 
                     self.format_input_core(valid_data_start, valid_data_line, path_in+item)
-
 
                 #new_name = item[0:item.index('@')+1] + str(core_num) + '.dat'
                 #os.rename(path1 + item, path1 + new_name)
@@ -149,7 +148,6 @@ class formatting:
 
                 if dir_name_new.find(self.ptn_golden) >= 0:
                     self.ls_golden.append(dir_name_new)
-
 
         #print(self.ls_in)
         #print(self.ls_golden)

@@ -1,0 +1,91 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]; then #或者if [[ $# < 1 ]]; then
+	echo Please input which directory to be done
+	exit
+fi
+
+diris=$1
+
+USER=$(whoami)
+PROJECT=/home/$USER/projects/tj_golden_up/tj3cycleacc/model
+RISC_V_CODE=$PROJECT/riscv/tc/basic
+
+
+FILE_LIST=$(find $1/ -name '*.c')
+
+max_y=0
+max_x=0
+file_cmd="ls $1/*.c" 
+file_num=$($file_cmd | wc -l)
+for i in $FILE_LIST
+do
+	file_name=$(basename $i .c)
+	locate1=$(expr index $file_name "@")
+	#locate2=$(expr index $file_name ".")
+	
+	#len_y=$[$locate2 - $locate1-1]
+	#y=$(expr substr "$file_name" $[$locate1 + 1]  $len_y)
+	
+	x=${file_name:$[$locate1]}	
+	y=${file_name:$[$locate1]}	
+
+	if [ $y -gt $max_y ]; then
+		max_y=$y
+	fi
+
+	if [ $x -gt $max_x ]; then
+    max_x=$x
+  fi	
+done
+
+DAT_LIST=$(find $1/ -name 'tv_mem2_*@0*.dat')
+max_phase=0
+for i in $DAT_LIST
+do
+	file_name=$(basename $i .dat)
+	
+	locate1=$(expr index $file_name "tv_mem2_")
+	locate2=$(expr index $file_name "@")
+	#echo $file_name $locate1 $locate2 
+	len_phase=$[$locate2 - $locate1 -8]
+	phase=$(expr substr "$file_name" $[$locate1 + 8]  $len_phase)
+	#echo $phase
+
+	if [ $phase -gt $max_phase ]; then
+		max_phase=$phase
+	fi
+done
+
+COLUMNS=$[$max_x+1]
+ROWS=$[$max_y+1]
+#CORE_NUM =$[$file_num-1]
+#如果需要修改每个phase的时钟数，请修改every_phase_clk的值
+every_phase_clk=20000
+PHASES=`expr $[$max_phase+1] \* $every_phase_clk`
+echo COLUMNS=$COLUMNS
+echo ROWS=$ROWS
+echo PHASES=$PHASES
+echo CORE_NUM=$file_num
+./main $COLUMNS $ROWS $PROJECT/para.h $PHASES $file_num
+
+rm -rf $PROJECT/tv_mem
+rm -rf $RISC_V_CODE
+
+mkdir -p $RISC_V_CODE
+
+ln -s $diris $PROJECT/ -rf
+
+ln -s $diris/*.c $RISC_V_CODE/ -rf
+cd $RISC_V_CODE/../../clib
+../scripts/run
+cd -
+cp -f $RISC_V_CODE/../../clib/*.hex ./$1
+cd $PROJECT
+make clean;make -j16
+./top 
+echo $1
+cp -r ../files/log/dump_file/ ../../../$1/../
+
+
+
