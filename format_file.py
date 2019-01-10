@@ -50,11 +50,16 @@ class formatting:
         ping_pong = 1
         last_core_id = 0
         first_entry = 1
+        incre_lp_cnt = 1
         file_list = os.listdir(path_in)
         file_list_hex = list(filter(self.end_with('.hex'),file_list))
         file_list_data = list(filter(self.end_with('.dat'),file_list))
         file_list_data.sort(key=lambda x: x[x.index('_',3)+1:x.index('@')])
         file_list_data.sort(key=lambda x: x[x.index('@') + 1:x.index('.')])
+
+        path_route = path_in.replace('tv_mem/', '')
+        route_file = path_route + 'board_route.txt'
+        route_cfg = self.read_route_cfg(route_file)
 
         for item in file_list_hex:
             #if item.endswith('.hex'):
@@ -75,22 +80,27 @@ class formatting:
                     os.remove(path_in + item)
                     continue
                 elif 'mem01' in fnlist and temp.find('input') > 0 and ph_num > '0':
-                    path_route = path_in.replace('tv_mem/','')
-                    route_file = path_route + 'board_route.txt'
-                    route_cfg = self.read_route_cfg(route_file)
 
                     mem_base1 = route_cfg[core_id][Route_cfg.MEM_BASE1_E.value]
-                    #mem_base2 = route_cfg[core_id][Route_cfg.MEM_BASE2_E.value]
-                    valid_data_start = mem_base1 / const.LINE_LEN + 1
-                    valid_data_line = (mem_base2 - mem_base1) / const.LINE_LEN
+                    incre = route_cfg[core_id][Route_cfg.INCRE_E.value]
+                    len = route_cfg[core_id][Route_cfg.LEN_E.value]
+                    incre_loop = route_cfg[core_id][Route_cfg.INCRE_LOOP_E.value]
+
+                    if core_id - last_core_id > 0:
+                        incre_lp_cnt = 0
+
+                    valid_data_start = int((mem_base1 + incre * incre_lp_cnt ) * 2 / const.LINE_LEN) + 1
+                    valid_data_line = int(len / const.FP16_CNT)
+
                     self.format_input_core(valid_data_start, valid_data_line, path_in + item)
 
+                    incre_lp_cnt += 1
+                    if incre_lp_cnt >= incre_loop:
+                        incre_lp_cnt = 0
+
+                    last_core_id = core_id
 
                 elif 'mem2' in fnlist and temp.find('input') > 0 and ph_num > '0':
-
-                    path_route = path_in.replace('tv_mem/', '')
-                    route_file = path_route + 'board_route.txt'
-                    route_cfg = self.read_route_cfg(route_file)
 
                     mem_base1 = route_cfg[core_id][Route_cfg.MEM_BASE1_E.value]
                     mem_base2 = route_cfg[core_id][Route_cfg.MEM_BASE2_E.value]
@@ -130,7 +140,7 @@ class formatting:
                 if 'mem2' in fnlist:
                     if ph_num != '0':
                         hw_phase_num = int(ph_num) - 1
-                        golden_name = 'tv_mem2_' + str(hw_phase_num) + '@' + str(core_id) + '.dat.hex.golden'
+                        golden_name = 'tv_mem2_' + str(hw_phase_num) + '@' + str(core_id) + '.dat.golden'
                         os.rename(path_golden + item, path_golden + golden_name)
                     else:
                         os.remove(path_golden + item)
