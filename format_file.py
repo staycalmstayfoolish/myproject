@@ -36,14 +36,23 @@ class formatting:
             f.seek(0)
             f.writelines(lines)
 
-    def end_with(self, *end_str):
+    def end_with(self, end_str, mem4ptn):
         ends = end_str
+        ptn = mem4ptn
         def run(s):
-            f = map(s.endswith, ends)
-            if True in f:
+            f1 = map(s.endswith, ends)
+            f2 = s.find(ptn)
+            if True in f1 and f2 == -1:
                 return s
         return run
 
+    def find_mem4(self, mem4ptn):
+        ptn = mem4ptn
+        def run(s):
+            f2 = s.find(ptn)
+            if f2 > 0:
+                return s
+        return run
 
     def formatting_input(self, path_in):
         path_in += '/'
@@ -52,10 +61,11 @@ class formatting:
         first_entry = 1
         incre_lp_cnt = 1
         file_list = os.listdir(path_in)
-        file_list_hex = list(filter(self.end_with('.hex'),file_list))
-        file_list_data = list(filter(self.end_with('.dat'),file_list))
-        file_list_data.sort(key=lambda x: x[x.index('_',3)+1:x.index('@')])
-        file_list_data.sort(key=lambda x: x[x.index('@') + 1:x.index('.')])
+        file_list_hex = list(filter(self.end_with('.hex',''),file_list))
+        file_list_data = list(filter(self.end_with('.dat', 'mem4'),file_list))
+        file_list_rlut = list(filter(self.find_mem4('mem4'), file_list))
+        file_list_data.sort(key=lambda x: int(x[x.index('_',3)+1:x.index('@')]))
+        file_list_data.sort(key=lambda x: int(x[x.index('@') + 1:x.index('.')]))
 
         path_route = path_in.replace('tv_mem/', '')
         route_file = path_route + 'board_route.txt'
@@ -82,9 +92,9 @@ class formatting:
                 elif 'mem01' in fnlist and temp.find('input') > 0 and ph_num > '0':
 
                     mem_base1 = route_cfg[core_id][Route_cfg.MEM_BASE1_E.value]
-                    incre = route_cfg[core_id][Route_cfg.INCRE_E.value]
+                    incre = route_cfg[core_id][Route_cfg.INCRE_E.value] * 2
                     len = route_cfg[core_id][Route_cfg.LEN_E.value]
-                    incre_loop = route_cfg[core_id][Route_cfg.INCRE_LOOP_E.value]
+                    incre_loop = int(route_cfg[core_id][Route_cfg.INCRE_LOOP_E.value] / 4)
 
                     if core_id - last_core_id > 0:
                         incre_lp_cnt = 0
@@ -121,12 +131,12 @@ class formatting:
 
                     self.format_input_core(valid_data_start, valid_data_line, path_in+item)
 
-                #new_name = item[0:item.index('@')+1] + str(core_num) + '.dat'
-                #os.rename(path1 + item, path1 + new_name)
-
-            if 'mem4' in fnlist:
-                new_name = 'tv_mem4_0@' + str(core_id) + '.dat'
-                os.rename(path_in + item, path_in + new_name)
+                    #new_name = item[0:item.index('@')+1] + str(core_id) + '.dat'
+                    #os.rename(path_in + item, path_in + new_name)
+        for item in file_list_rlut:
+            core_id = int(item[item.index('@')+1:item.index('.')])
+            new_name = 'tv_mem4_0@' + str(core_id) + '.dat'
+            os.rename(path_in + item, path_in + new_name)
     def formatting_golden(self, path_golden):
         path_golden += '/'
         for item in os.listdir(path_golden):

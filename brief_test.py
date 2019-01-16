@@ -40,3 +40,13 @@ file_list_data.sort(key = lambda x: x[x.index('@')+1:x.index('.')])
 print(file_list_data)
 
 print(type(Route_cfg.MEM_BASE1_E.value))
+
+a = 'tv_mem01_20@2.input.dat'
+print(int(a[a.index('_',3)+1:a.index('@')]))
+print(int(a[a.index('@') + 1:a.index('.')]))
+print(a.split('_')[2][0:a.split('_')[2].index('@')])
+b = a.find('mem2')
+print(type(b))
+list1 = [1, 3 ,5, 7, 9]
+list2 = [3, 7, 9]
+print(list(set(lis1) - set(list2)))
