@@ -50,3 +50,6 @@ print(type(b))
 list1 = [1, 3 ,5, 7, 9]
 list2 = [3, 7, 9]
 print(list(set(lis1) - set(list2)))
+
+list = [i*2 for i in range(1,5) if i%2==0]
+print(list)

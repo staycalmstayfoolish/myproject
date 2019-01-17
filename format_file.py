@@ -15,6 +15,28 @@ class formatting:
         self.ptn_input_core = 'board_route'
         self.ptn_invalid = '---- '*(const.FP16_CNT-1) + '----\n'
         self.input_core_cnt = 0
+        self.ptn_n_recv = 'N_RECEIVED'
+        self.ptn_define = '#define'
+        self.ptn_set_nrecv0 = '#define N_RECEIVED  0' + '\n'
+        self.ptn_input_file = '.input.dat'
+
+    def modify_incore_nrecv(self, path_in):
+        path_in += '/'
+        file_list = os.listdir(path_in)
+        input_core_list = [item for item in file_list if item.endswith(self.ptn_input_file)]
+        max_input_core = max(map(lambda x: int(x[x.index('@')+1:x.index('.')]), input_core_list))
+
+        for i in range(0, max_input_core+1):
+            with open(path_in + 'risccode@' + str(i) + '.c', 'r+') as f:
+                lines = f.readlines()
+                line_idx = 0
+                for line in lines:
+                    if line.find(self.ptn_n_recv) > 0 and line.split(' ')[1] == self.ptn_n_recv:
+                        lines[line_idx] = self.ptn_set_nrecv0
+                        break
+                    line_idx += 1
+                f.seek(0)
+                f.writelines(lines)
 
     def read_route_cfg(self, path_route):
         total_core_cfg = []
@@ -92,9 +114,9 @@ class formatting:
                 elif 'mem01' in fnlist and temp.find('input') > 0 and ph_num > '0':
 
                     mem_base1 = route_cfg[core_id][Route_cfg.MEM_BASE1_E.value]
-                    incre = route_cfg[core_id][Route_cfg.INCRE_E.value] * 2
+                    incre = 1792#route_cfg[core_id][Route_cfg.INCRE_E.value] * 2
                     len = route_cfg[core_id][Route_cfg.LEN_E.value]
-                    incre_loop = int(route_cfg[core_id][Route_cfg.INCRE_LOOP_E.value] / 4)
+                    incre_loop = int(route_cfg[core_id][Route_cfg.INCRE_LOOP_E.value] / 28)
 
                     if core_id - last_core_id > 0:
                         incre_lp_cnt = 0
@@ -129,10 +151,11 @@ class formatting:
 
                     last_core_id = core_id
 
-                    self.format_input_core(valid_data_start, valid_data_line, path_in+item)
-
-                    #new_name = item[0:item.index('@')+1] + str(core_id) + '.dat'
-                    #os.rename(path_in + item, path_in + new_name)
+                    if not const.FOR_SIMU:
+                        self.format_input_core(valid_data_start, valid_data_line, path_in+item)
+                    else:
+                        new_name = item[0:item.index('@')+1] + str(core_id) + '.dat'
+                        os.rename(path_in + item, path_in + new_name)
         for item in file_list_rlut:
             core_id = int(item[item.index('@')+1:item.index('.')])
             new_name = 'tv_mem4_0@' + str(core_id) + '.dat'
@@ -160,17 +183,18 @@ class formatting:
     def get_all_subdir(self, rootdir):
 
         for root, dirs, files in os.walk(rootdir):
-            files = None
-            for dirname in dirs:
-                dir_name_new = os.path.join(root, dirname)
+            files[:]= []
+            #for dirname in dirs:
+            if not dirs:
+                dir_name_new = root
+
                 if dir_name_new.find(self.ptn_in) >= 0:
                     self.ls_in.append(dir_name_new)
 
-                if dir_name_new.find(self.ptn_golden) >= 0:
+                elif dir_name_new.find(self.ptn_golden) >= 0:
                     self.ls_golden.append(dir_name_new)
-
-        #print(self.ls_in)
-        #print(self.ls_golden)
+        print(self.ls_in)
+        print(self.ls_golden)
 
         return self.ls_in, self.ls_golden
 
@@ -178,12 +202,16 @@ if __name__ == '__main__':
 
     fmt = formatting()
     fmt.ls_in, fmt.ls_golden = fmt.get_all_subdir(fmt.root_dir)
-
-    prcs = Pool(8)
-    prcs.map(fmt.formatting_input, fmt.ls_in)
-    prcs.map(fmt.formatting_golden, fmt.ls_golden)
-    prcs.close()
-    prcs.join()
-
+    if not const.FOR_SIMU:
+        prcs = Pool(8)
+        prcs.map(fmt.formatting_input, fmt.ls_in)
+        prcs.map(fmt.formatting_golden, fmt.ls_golden)
+        prcs.close()
+        prcs.join()
+    else:
+        prcs = Pool(8)
+        prcs.map(fmt.modify_incore_nrecv, fmt.ls_in)
+        prcs.close()
+        prcs.join()
 
 

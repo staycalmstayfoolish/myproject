@@ -17,3 +17,4 @@ const.LINE_LEN = 128
 const.MEM2_BASE = 262144 #0x40000
 const.MEM2_ROWS = 128
 const.NET_ID = 0 #0,mlp; else, other nets
+const.FOR_SIMU = 1
