@@ -53,3 +53,7 @@ print(list(set(lis1) - set(list2)))
 
 list = [i*2 for i in range(1,5) if i%2==0]
 print(list)
+
+list = [ 1,2,3,4,5]
+list = [x = 6 for x in list if x.index() > 2]
+print(list)

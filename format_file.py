@@ -1,6 +1,8 @@
+#!/usr/bin/python
 import os
 import re
 import shutil
+import math
 from multiprocessing import Pool
 from constant import const
 from route_cfg_enum import Route_cfg
@@ -13,12 +15,25 @@ class formatting:
         self.ptn_in = 'tv_mem'
         self.ptn_golden = 'dump_file'
         self.ptn_input_core = 'board_route'
-        self.ptn_invalid = '---- '*(const.FP16_CNT-1) + '----\n'
+        self.ptn_invalid_line = '---- '*(const.FP16_CNT-1) + '----\n'
+        self.ptn_invalid_single = '----'
         self.input_core_cnt = 0
         self.ptn_n_recv = 'N_RECEIVED'
         self.ptn_define = '#define'
         self.ptn_set_nrecv0 = '#define N_RECEIVED  0' + '\n'
         self.ptn_input_file = '.input.dat'
+
+    def replace_nrecv_value(self, file_name):
+        with open(file_name, 'r+') as f:
+            lines = f.readlines()
+            line_idx = 0
+            for line in lines:
+                if line.find(self.ptn_n_recv) > 0 and line.split(' ')[1] == self.ptn_n_recv:
+                    lines[line_idx] = self.ptn_set_nrecv0
+                    break
+                line_idx += 1
+            f.seek(0)
+            f.writelines(lines)
 
     def modify_incore_nrecv(self, path_in):
         path_in += '/'
@@ -26,17 +41,8 @@ class formatting:
         input_core_list = [item for item in file_list if item.endswith(self.ptn_input_file)]
         max_input_core = max(map(lambda x: int(x[x.index('@')+1:x.index('.')]), input_core_list))
 
-        for i in range(0, max_input_core+1):
-            with open(path_in + 'risccode@' + str(i) + '.c', 'r+') as f:
-                lines = f.readlines()
-                line_idx = 0
-                for line in lines:
-                    if line.find(self.ptn_n_recv) > 0 and line.split(' ')[1] == self.ptn_n_recv:
-                        lines[line_idx] = self.ptn_set_nrecv0
-                        break
-                    line_idx += 1
-                f.seek(0)
-                f.writelines(lines)
+        input_core = [path_in + 'risccode@' + str(i) + '.c' for i in range(max_input_core + 1)]
+        list(map(self.replace_nrecv_value, input_core))
 
     def read_route_cfg(self, path_route):
         total_core_cfg = []
@@ -49,11 +55,21 @@ class formatting:
                 total_core_cfg.append(single_core_cfg)
         return total_core_cfg
 
-    def format_input_core(self, valid_start, valid_lines, path_input_core):
+    def format_input_core(self, valid_start, valid_cnt, path_input_core):
         with open(path_input_core, 'r+') as f:
+
             lines = f.readlines()
-            lines[0:valid_start-1] = [self.ptn_invalid]*(valid_start-1)
-            lines[valid_start+valid_lines-1:const.MEM2_ROWS] = [self.ptn_invalid]*(const.MEM2_ROWS-valid_start-valid_lines+1)
+            lines[0:valid_start-1] = [self.ptn_invalid_line]*(valid_start-1)
+
+            valid_lines, valid_data_residual = divmod(valid_cnt, const.FP16_CNT)
+            temp_split = lines[valid_start+valid_lines-1].split(' ')
+            #temp = temp_split[:valid_data_residual] + [self.ptn_invalid_single] * (const.FP16_CNT - valid_data_residual)
+            #temp[-1] = '----\n'
+            temp_split[valid_data_residual:-1] = [self.ptn_invalid_single] * (const.FP16_CNT - valid_data_residual)
+            temp_split[-1] = '----\n'
+            lines[valid_start + valid_lines - 1] = ' '.join(temp_split)
+
+            lines[valid_start+valid_lines:const.MEM2_ROWS] = [self.ptn_invalid_line]*(const.MEM2_ROWS-valid_start-valid_lines)
 
             f.seek(0)
             f.writelines(lines)
@@ -122,9 +138,9 @@ class formatting:
                         incre_lp_cnt = 0
 
                     valid_data_start = int((mem_base1 + incre * incre_lp_cnt ) * 2 / const.LINE_LEN) + 1
-                    valid_data_line = int(len / const.FP16_CNT)
+                    #valid_data_line = int(len / const.FP16_CNT)
 
-                    self.format_input_core(valid_data_start, valid_data_line, path_in + item)
+                    self.format_input_core(valid_data_start, len, path_in + item)
 
                     incre_lp_cnt += 1
                     if incre_lp_cnt >= incre_loop:
@@ -147,15 +163,19 @@ class formatting:
                             ping_pong = 0 if ping_pong == 1 else 1
 
                     valid_data_start = int((mem_base2 - const.MEM2_BASE) / const.LINE_LEN) + 1 if ping_pong == 1 else int((mem_base1 - const.MEM2_BASE) / const.LINE_LEN) + 1
-                    valid_data_line = int((mem_base2 - mem_base1) / const.LINE_LEN)
+                    #valid_data_line = int((mem_base2 - mem_base1) / const.LINE_LEN)
+                    valid_data_cnt = route_cfg[core_id][Route_cfg.LEN_E.value]
 
                     last_core_id = core_id
 
-                    if not const.FOR_SIMU:
-                        self.format_input_core(valid_data_start, valid_data_line, path_in+item)
-                    else:
-                        new_name = item[0:item.index('@')+1] + str(core_id) + '.dat'
+                    if const.FOR_SIMU:
+                        new_name = item[0:item.index('@') + 1] + str(core_id) + '.dat'
                         os.rename(path_in + item, path_in + new_name)
+
+                    else:
+                        # self.format_input_core(valid_data_start, valid_data_line, path_in+item)
+                        self.format_input_core(valid_data_start, valid_data_cnt, path_in + item)
+
         for item in file_list_rlut:
             core_id = int(item[item.index('@')+1:item.index('.')])
             new_name = 'tv_mem4_0@' + str(core_id) + '.dat'
@@ -202,15 +222,16 @@ if __name__ == '__main__':
 
     fmt = formatting()
     fmt.ls_in, fmt.ls_golden = fmt.get_all_subdir(fmt.root_dir)
-    if not const.FOR_SIMU:
+
+    if const.FOR_SIMU:
         prcs = Pool(8)
-        prcs.map(fmt.formatting_input, fmt.ls_in)
-        prcs.map(fmt.formatting_golden, fmt.ls_golden)
+        prcs.map(fmt.modify_incore_nrecv, fmt.ls_in)
         prcs.close()
         prcs.join()
     else:
         prcs = Pool(8)
-        prcs.map(fmt.modify_incore_nrecv, fmt.ls_in)
+        prcs.map(fmt.formatting_input, fmt.ls_in)
+        prcs.map(fmt.formatting_golden, fmt.ls_golden)
         prcs.close()
         prcs.join()
 
